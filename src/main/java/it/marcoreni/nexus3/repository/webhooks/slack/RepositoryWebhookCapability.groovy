@@ -70,8 +70,12 @@ class RepositoryWebhookCapability
     @DefaultMessage('Send the request to this Hook URL')
     String urlHelp()
 
-    @DefaultMessage('%s')
+    @DefaultMessage('Slack Webhook')
     String description(String names)
+
+    @DefaultMessage('Slack webhook')
+    String about()
+
   }
 
   @PackageScope
@@ -244,7 +248,7 @@ class RepositoryWebhookCapability
 
     @Override
     protected String renderAbout() {
-      return render("$TYPE_ID-about.vm")
+      return messages.about()
     }
 
     @Override
