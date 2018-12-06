@@ -12,7 +12,7 @@
     Eclipse Foundation. All other trademarks are the property of their respective owners.
 
 -->
-# Nexus Shutdown Backup Plugin
+# Nexus Slack Webhook Plugin
 
 # Table Of Contents
 * [Developing](#developing)
