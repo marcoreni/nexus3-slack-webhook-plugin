@@ -1,9 +1,14 @@
 package it.marcoreni.nexus3.repository.webhooks.slack
 
-import in.ashwanthkumar.slack.webhook.Slack
-import in.ashwanthkumar.slack.webhook.SlackMessage
+import org.apache.http.HttpResponse
+import org.apache.http.client.methods.HttpPost
+import org.apache.http.entity.StringEntity
+import org.apache.http.impl.client.CloseableHttpClient
+import org.apache.http.impl.client.HttpClientBuilder
+import org.sonatype.nexus.webhooks.WebhookConfiguration
 import org.sonatype.nexus.webhooks.WebhookSubscription
 
+import javax.annotation.PostConstruct
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
@@ -94,7 +99,7 @@ class RepositoryComponentWebhook
       )
 
       subscriptions.each {
-        def configuration = it.configuration as RepositoryWebhook.Configuration
+        def configuration = it.configuration as Configuration
         if (configuration.repository == event.repositoryName) {
           // TODO: discriminate on content-selector
           queue(it, payload)
@@ -103,23 +108,38 @@ class RepositoryComponentWebhook
     }
   }
 
+  private CloseableHttpClient httpClient
+
+  @PostConstruct
+  void init() {
+    httpClient = HttpClientBuilder.create().build()
+  }
+
   protected void queue(WebhookSubscription subscription, RepositoryComponentWebhookPayload body) {
-    this.log.debug("Queuing request for {} -> {}", subscription, body);
+    this.log.debug("Queuing request for {} -> {}", subscription, body)
 
-    new Slack(configuration.url)
-      .push(
-            new SlackMessage("Package ")
-                    .bold(body.component.group + "/" + body.component.name)
-                    .text(": new version ")
-                    .bold(body.component.version)
-                    .text(" published!"))
+    String message = "{\"text\": \"Package \"}"
 
-//    request.setWebhook(this);
-//    request.setPayload(body);
-//    WebhookConfiguration configuration = subscription.getConfiguration();
-//    request.setUrl(configuration.getUrl());
-//    request.setSecret(configuration.getSecret());
-//    this.eventManager.post(new WebhookRequestSendEvent(request));
+    WebhookConfiguration configuration = subscription.getConfiguration();
+    String url = configuration.url
+    HttpPost request = new HttpPost(url)
+
+    try {
+      request.setEntity(new StringEntity(message))
+
+      HttpResponse response = httpClient.execute(request)
+
+      if (response.getStatusLine().getStatusCode() >= 400
+              && response.getStatusLine().getStatusCode() < 600) {
+        // either a 4xx or 5xx response from the server, not good
+        this.log.warn("Got a bad HTTP response '" + response.getStatusLine() + "' for " + url)
+      } else {
+        this.log.debug("Response from " + url + " is : " + response.getStatusLine())
+      }
+
+    } finally {
+      request.releaseConnection();
+    }
   }
 
   static class RepositoryComponentWebhookPayload
@@ -144,4 +164,5 @@ class RepositoryComponentWebhook
       String version
     }
   }
+
 }
